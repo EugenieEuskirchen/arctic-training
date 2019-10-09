@@ -1,0 +1,190 @@
+---
+title: "Data tidying lesson"
+author: "Eugenie Euskirchen"
+date: "10/9/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r package_load}
+library(dplyr)
+library(tidyr)
+```
+
+To access 'filter' from the 'stats' package:
+'status::filter()'
+
+#Read in and clean up data
+
+```{r read in data}
+catch_original <- read.csv(url("https://knb.ecoinformatics.org/knb/d1/mn/v2/object/df35b.302.1", method = "libcurl"),
+                    stringsAsFactors = FALSE)
+head(catch_original)
+```
+
+#Tidy the data
+Select the columns we want using the select function, 'select()'
+Make sure the pipe is at the end of the line
+
+```{r}
+catch_data <- catch_original %>% 
+ # select(Region, Year, Chinook, Sockeye, Coho, Pink, Chum)
+  #same as the previous way, but it just says not to take into account rows with All and notesRegCode, instead of just typing the columns we want, as above.
+  select(-All, -notesRegCode)
+head(catch_data)
+```
+
+```{r}
+summary(catch_data)
+```
+Change teh values in the Chinook colum to mumeric using 'mutate()'
+```{r}
+catch_clean <- catch_data %>% 
+  mutate(Chinook=as.numeric(Chinook))
+
+head(catch_clean)
+```
+Investigate using 'which() and is.no()
+Which NAs were introduced by coercion?
+```{r}
+i <- which(is.na(catch_clean$Chinook))
+i
+```
+Determine which rows have characters in the Chinook column:
+
+```{r}
+catch_original[i,]
+```
+
+Row 401 has an 'I' instead of a '1'
+Now need to fix this in a script, instead of just changing it in the original dataset.
+Use 'mutate' to change the 'I' to a '1'
+Use 'mutate' to coerce Chinook column to numeric
+```{r}
+catch_clean <- catch_data %>% 
+  mutate(Chinook = ifelse(Chinook == "I", 1, Chinook)) %>%
+  mutate(Chinook = as.integer(Chinook))
+
+head(catch_clean)
+```
+
+Move from wide format to tall format using pivot_longer()
+Pivot over all columns except Region and Year
+```{r}
+catch_long <- catch_clean %>% 
+  pivot_longer(cols = -c(Region, Year),
+               names_to ="species",
+               values_to = 'catch')
+head(catch_long)
+```
+Going back to where we were previously using 'catch_wide'
+```{r}
+catch_wide <- catch_long %>% 
+  pivot_wider(names_from = species,
+              values_from =catch)
+head(catch_wide)
+```
+
+Fish units are in thousands
+'rename()catch to catch_thousands
+```{r}
+#catch_long <- catch_long %>% 
+ # rename(catch_thousands = catch) %>% 
+  #mutate(catch = catch_thousands * 1000) %>% 
+  #select(-catch_thousands)
+#A better way to do the above
+catch_long <- catch_long %>% 
+  mutate(catch = catch *1000)
+
+head(catch_long)
+```
+
+
+#Summarize the data
+Mean catch by region by species
+
+```{r}
+mean_region <- catch_long %>% 
+  group_by(Region, species) %>% 
+  summarise(mean_catch = mean(catch),
+            n_obs = n())
+mean_region
+```
+
+Mean sockeye catch by region
+```{r}
+mean_sockeye_region <- catch_long %>% 
+  filter(species == "Sockeye") %>% 
+  group_by(Region) %>% 
+  summarise(mean_catch = mean(catch))
+
+mean_sockeye_region
+```
+Total annual catch
+```{r}
+annual_catch <- catch_long %>% 
+  group_by(Year) %>% 
+  summarise(total_catch = sum(catch)) %>% 
+  arrange(desc(total_catch))
+
+annual_catch
+```
+Read in another data table
+```{r}
+region_defs <- read.csv(url("https://knb.ecoinformatics.org/knb/d1/mn/v2/object/df35b.303.1",
+                            method = "libcurl"),
+                        stringsAsFactors = FALSE) %>% 
+    select(code, mgmtArea)
+
+head(region_defs)
+```
+Left join the two data sets, specifying with the 'by' statement which columns get joined.
+```{r}
+catch_joined <-
+  left_join(catch_long, region_defs, by =c("Region"= "code"))
+head(catch_joined)
+```
+
+Another way to do the same thing as above.
+
+```{r}
+region_defs <-  region_defs %>% 
+  rename(Region = code)
+
+catch_joined <-  left_join(catch_long, region_defs, by = "Region")
+catch_joined <-  left_join(catch_long, region_defs)
+
+```
+#Seperate and unite example
+```{r}
+dates_df <- data.frame(date = c("5/24/1930",
+                                "5/25/1930",
+                                "5/26/1930",
+                                "5/27/1930",
+                                "5/28/1930"),
+                       stringsAsFactors = FALSE)
+
+dates_df %>% 
+  separate(date, c("month", "day", "year"), "/", remove = FALSE)
+
+dates_df %>% 
+  mutate(three_char = substr(date, start = 1, stop = 3))
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
