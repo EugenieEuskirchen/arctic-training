@@ -13,6 +13,8 @@ knitr::opts_chunk$set(echo = TRUE)
 library(dplyr)
 library(tidyr)
 library(ggplot2)
+library(DT)
+library(leaflet)
 ```
 
 
@@ -62,21 +64,62 @@ ggplot (data = filter(annual_esc, SASAP.Region == "Kodiak"),
   my_theme
 ```
 Escapment over time: all regions
-```{r}
-ggplot(annual_esc, aes(x = Year, y = total_escapment, color = Species))+
+```{r, fig.width = 7, fig.height = 12, echo = FALSE}
+fig1 <- ggplot(annual_esc, aes(x = Year, y = total_escapment, color = Species))+
   geom_point()+
   geom_line()+
   facet_wrap(~SASAP.Region, scales = "free_y", ncol = 1)
 #free_y above frees the y-scale for uneven data
 #Below: more than one column of data
 #facet_wrap(~SASAP.Region, scales = "free_y")
+my_theme
+
+fig1
+ggsave("figures/escapment.png", fig1, width = 12, height = 7, units ="in")
 
 ```
 
 #Map sampling locations
+Create a table with unique sampling locations, latitudes, and longitudes
+```{r}
+locations <- esc %>% 
+  distinct(Location, Latitude, Longitude) %>% 
+  drop_na()
+
+head(locations)
+```
+```{r}
+datatable(locations)
+```
+```{r, echo=FALSE}
+datatable(locations)
+```
+```{r}
+leaflet(locations) %>% 
+  addTiles() %>% 
+  addMarkers(~Longitude,  ~Latitude, popup = ~Location)
+```
 
 
+```{r}
+leaflet(locations) %>% 
+  addWMSTiles("https://www.gebco.net/data_and_products/gebco_web_services/web_map_service/mapserv?",
+              layers = 'GEBCO_LATEST',
+              attribution = "Imagery reproduced from the GEBCO_2014 Grid, version 20150318, www.gebco.net") %>%
+  addCircleMarkers(lng = ~Longitude,
+                   lat = ~Latitude,
+                   popup = ~ Location,
+                   radius = 5,
+                   # set fill properties
+                   fillColor = "salmon",
+                   fillOpacity = 1,
+                   # set stroke properties
+                   stroke = T,
+                   weight = 0.5,
+                   color = "white",
+                   opacity = 1)
 
+```
 
 
 
